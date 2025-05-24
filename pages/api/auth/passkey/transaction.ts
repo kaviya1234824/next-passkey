@@ -10,7 +10,7 @@ const {
 let cached: { token: string; expiresAt: number } | null = null;
 
 export async function getAccessToken(): Promise<string> {
-  const now = Date.now();   
+  const now = Date.now();
   if (cached && cached.expiresAt > now) {
     return cached.token;
   }
@@ -43,24 +43,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end("Method Not Allowed");
   }
 
-  const { type, externalId, displayName } = req.body;
-  if (!["register", "authenticate"].includes(type) || !externalId || !displayName) {
-    return res.status(400).json({ error: "Missing or invalid fields" });
+  const rawType = req.query.type;
+  const type = Array.isArray(rawType) ? rawType[0] : rawType;
+  if (typeof type !== "string" || !["register", "authenticate"].includes(type)) {
+    return res.status(400).json({ error: "Invalid or missing transaction type" });
+  }
+
+  const { externalId, displayName } = req.body;
+  if (!externalId || !displayName) {
+    return res.status(400).json({ error: "Missing fields" });
   }
 
   try {
     const token = await getAccessToken();
-    const apiRes = await fetch(
-      `https://${TENANT_DOMAIN}/api/v1/passkey-plus/${APP_ID}/transaction/${type}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ externalId, displayName }),
-      }
-    );
+    let apiRes;
+    if (type === "register") {
+      apiRes = await fetch(
+        `https://${TENANT_DOMAIN}/api/v1/passkey-plus/${APP_ID}/transaction/register`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ externalId, displayName }),
+        }
+      );
+    }
+    else {
+      apiRes = await fetch(
+        `https://${TENANT_DOMAIN}/api/v1/passkey-plus/${APP_ID}/transaction/authenticate`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ externalId, displayName }),
+        }
+      );
+    }
 
     if (!apiRes.ok) {
       const err = await apiRes.text();
@@ -68,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const payload = await apiRes.json();
-    const inner   = payload.data;
+    const inner = payload.data;
     if (!inner?.transactionId) {
       console.error("Unexpected transaction response:", payload);
       return res
@@ -78,8 +100,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({
       transactionId: inner.transactionId,
-      id:            inner.id,
-      verified:      inner.verified,
+      id: inner.id,
+      verified: inner.verified,
     });
   } catch (e: any) {
     console.error("Passkey transaction error:", e);

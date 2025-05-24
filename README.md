@@ -1,36 +1,145 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# passkey-plus-nextjs-example
 
-## Getting Started
+This is a Next.js application demonstrating how to integrate passkey-based authentication using the AuthAction Passkey+ SDK and custom API routes.
 
-First, run the development server:
+## Overview
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+This project covers:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Passkey registration** flow via AuthAction Passkey-plus  
+- **Passkey authentication** flow (biometric or platform authenticator)  
+- **Secure transaction** handling with machine-to-machine (M2M) token caching  
+- **Client SDK integration** for `register` and `authenticate` calls  
+- **Storing** minimal session info in `localStorage` and displaying a simple dashboard  
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Prerequisites
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Node.js** v16 or newer  
+2. **Next.js** project scaffolded (e.g. `npx create-next-app`)  
+3. **AuthAction Passkey+** enabled tenant with:  
+   - Tenant domain  
+   - M2M Client ID & Secret  
+   - App ID  
+4. **@authaction/passkey-plus-sdk** installed  
 
-## Learn More
+## Installation
 
-To learn more about Next.js, take a look at the following resources:
+1. **Clone the repository**:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```bash
+   git clone https://github.com/your-org/passkey-plus-nextjs-example.git
+   cd passkey-plus-nextjs-example
+   ```
+2. **Install Dependencies**:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   npm install
+   ```
 
-## Deploy on Vercel
+3. **Configure your Authaction credentials**:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   configure your AuthAction OAuth2 details using environment variables in your .env file
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+   ```bash
+   # Server-side (for API routes)
+   AUTHACTION_TENANT_DOMAIN=your-tenant.authaction.com
+   AUTHACTION_PASSKEY_CLIENT_ID=your-m2m-client-id
+   AUTHACTION_PASSKEY_CLIENT_SECRET=your-m2m-client-secret
+   AUTHACTION_APP_ID=your-app-id
+
+   # Client-side SDK
+   NEXT_PUBLIC_AUTHACTION_TENANT_DOMAIN=your-tenant.authaction.com
+   NEXT_PUBLIC_AUTHACTION_APP_ID=your-app-id
+
+   ```
+
+## Usage
+
+1. **Start the Development Server**
+
+    ```bash
+    npm run dev
+    ```
+
+    This will start the Next application on `http://localhost:3000`.
+
+2. **Register a passkey:**
+
+    Navigate to http://localhost:3000
+    Enter an External ID and Display Name
+    Click Register with Passkey and follow your authenticator
+
+3. **Authenticate:**
+
+    On the same form, click Login with Passkey
+    Follow your platform authenticator to sign in
+
+4. **View Dashboard:**
+
+    After successful auth, you’ll be redirected to /dashboard
+    Dashboard reads { username, email } from localStorage and displays it
+
+## Code Explanation
+
+### API Route: `/api/auth/passkey/transaction`
+
+Handles both registration and authentication:
+- **Reads** `type` from `req.query` (`register` or `authenticate`)
+- **Validates** `externalId` & `displayName` in the request body
+- **Fetches** an M2M token (cached to avoid redundant calls)
+- **Explicit fetch** to one of:
+  - `/api/v1/passkey-plus/{APP_ID}/transaction/register`
+  - `/api/v1/passkey-plus/{APP_ID}/transaction/authenticate`
+- **Returns**  
+  ```json
+  {
+    "transactionId": "...",
+    "id": "...",
+    "verified": true|false
+  }
+
+### API Route: `/api/auth/passkey/verify`
+
+Verifies the client's passkey response:
+
+* Accepts `{ transactionId, nonce }`
+* Forwards to AuthAction Passkey+ verify endpoint
+* Returns success or error
+
+### Component: `PasskeyAuth`
+
+**Location:** `components/PasskeyAuth.tsx`
+
+* Two buttons: **Register** & **Login**
+* `handleRegister` / `handleAuthenticate` do:
+  1. POST to `/api/auth/passkey/transaction?type=...`
+  2. SDK call: `passkeyPlus.register` or `passkeyPlus.authenticate`
+  3. POST to `/api/auth/passkey/verify`
+  4. Trigger `onSuccess` or `onError`
+
+### Page: `index.tsx` (Login)
+
+* Simple form to collect `externalId` & `displayName`
+* On submit, renders `PasskeyAuth`
+* `onSuccess` stores `{ username, email }` in `localStorage` and redirects to `/dashboard`
+
+### Page: `dashboard.tsx`
+
+* Client-side only (`"use client"`)
+* Reads `authUser` from `localStorage`
+* Displays `username` and `email`
+* Shows loading state if no data
+
+## Common Issues
+
+* **LocalStorage not set**: Ensure `onSuccess` writes to `localStorage` before redirect
+* **M2M token errors**: Check your M2M Client ID/Secret and Tenant Domain
+* **CORS or network issues**: Ensure your browser can reach your AuthAction tenant
+
+## Contributing
+
+Contributions, issues, and feature requests are welcome! Feel free to:
+
+* Open an issue to report bugs
+* Submit pull requests for improvements
+

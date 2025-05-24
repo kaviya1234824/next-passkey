@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const token = await getAccessToken();
     const apiRes = await fetch(
-      `https://${TENANT_DOMAIN}/api/v1/passkey-plus/${APP_ID}/transaction/verify/${transactionId}`,
+      `https://${TENANT_DOMAIN}/api/v1/passkey-plus/${APP_ID}/authenticate/verify`,
       {
         method: "POST",
         headers: {

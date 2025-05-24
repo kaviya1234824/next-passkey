@@ -29,10 +29,10 @@ const PasskeyAuth: React.FC<PasskeyAuthProps> = ({
     setLoading(true);
 
     try {
-      const txRes = await fetch("/api/auth/passkey/transaction", {
+      const txRes = await fetch(`/api/auth/passkey/transaction?type=${type}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, externalId, displayName }),
+        body: JSON.stringify({ externalId, displayName }),
       });
       const tx = await txRes.json();
       if (!tx.transactionId) {
